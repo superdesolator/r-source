@@ -149,6 +149,9 @@ extern void BindDomain(char *R_Home);
 /* In src/main/main.c, to avoid inlining */
 extern uintptr_t dummy_ii(void);
 
+/* Protection against embedded misuse, PR#15420 */
+static int num_initialized = 0;
+
 int Rf_initialize_R(int ac, char **av)
 {
     int i, ioff = 1, j;
@@ -157,6 +160,11 @@ int Rf_initialize_R(int ac, char **av)
     structRstart rstart;
     Rstart Rp = &rstart;
     Rboolean force_interactive = FALSE;
+
+    if (num_initialized++) {
+	fprintf(stderr, "%s", "R is already initialized\n");
+	exit(1);
+    }
 
 
 #if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_GETRLIMIT)
@@ -246,7 +254,7 @@ int Rf_initialize_R(int ac, char **av)
 		if(i+1 < ac) {
 		    avv++; p = *avv; ioff++;
 		} else {
-		    sprintf(msg,
+		    snprintf(msg, 1024,
 			    _("WARNING: --gui or -g without value ignored"));
 		    R_ShowMessage(msg);
 		    p = "X11";

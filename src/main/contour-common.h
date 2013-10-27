@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
    Adapted by Paul Murrell
 */
 
-
+/* Included by src/main/plot3d.c and src/library/graphics/src/plot3d  */
 
 	/*  C o n t o u r   P l o t t i n g  */
 
@@ -39,7 +39,9 @@ typedef struct SEG {
 
 static int ctr_intersect(double z0, double z1, double zc, double *f)
 {
-    if ((z0 - zc) * (z1 - zc) < 0.0) {
+/*  Old test was  ((z0 - zc) * (z1 - zc) < 0.0), but rounding led to inconsistencies 
+    in PR#15454 */
+    if ( (z0 < zc) != (z1 < zc) && z0 != zc && z1 != zc ) { 
 	*f = (zc - z0) / (z1 -	z0);
 	return 1;
     }
@@ -157,6 +159,8 @@ static SEGP ctr_segupdate(double xend, double yend, int dir, Rboolean tail,
 
 /*
  * Generate a list of segments for a single level
+ *
+ * NB this R_allocs its return value, so callers need to manage R_alloc stack.
  */
 static SEGP* contourLines(double *x, int nx, double *y, int ny,
 			 double *z, double zc, double atom)
@@ -323,7 +327,7 @@ static SEGP* contourLines(double *x, int nx, double *y, int ny,
 		    seglist = ctr_newseg(xx[0], yy[0], xx[1], yy[1], seglist);
 		    seglist = ctr_newseg(xx[2], yy[2], xx[3], yy[3], seglist);
 		}
-		else error("k != 2 or 4");
+		else error("k = %d, should be 2 or 4", k);
 	    }
 	    segmentDB[i + j * nx] = seglist;
 	}

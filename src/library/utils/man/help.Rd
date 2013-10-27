@@ -49,7 +49,7 @@ help(topic, package = NULL, lib.loc = NULL,
     \item HTML help pages with hyperlinks to other topics, shown in a
     browser by \code{\link{browseURL}}.
 #ifdef unix
-    (Where possible an existing browser window is re-used: the Mac OS X
+    (Where possible an existing browser window is re-used: the OS X
     GUI uses its own browser window.)
 #endif
     If for some reason HTML help is unavailable (see
@@ -120,10 +120,9 @@ help(topic, package = NULL, lib.loc = NULL,
   otherwise the function of that name in the \code{utils} namespace (to
   which the first paragraph applies).  It should accept at least two
   arguments, the name of the LaTeX file to be typeset and the type
-  (which as from \R 2.15.0 is ignored).  As from \R 2.14.0 it should
-  accept a third argument, \code{texinputs}, which will give the
-  graphics path when the help document contains figures, and will
-  otherwise not be supplied.
+  (which as from \R 2.15.0 is ignored).  It accepts a third argument,
+  \code{texinputs}, which will give the graphics path when the help
+  document contains figures, and will otherwise not be supplied.
 }
 
 \note{

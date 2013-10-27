@@ -78,9 +78,6 @@ as.POSIXlt(x, tz = "", \dots)
   Logical \code{NA}s can be converted to either of the classes, but no
   other logical vectors can be.
 
-  The \code{as.double} method converts \code{"POSIXlt"} objects to
-  \code{"POSIXct"}.
-
   If you are given a numeric time as the number of seconds since an
   epoch, see the examples.
 
@@ -155,8 +152,6 @@ z <- 1472562988
 # ways to convert this
 as.POSIXct(z, origin = "1960-01-01")                # local
 as.POSIXct(z, origin = "1960-01-01", tz = "GMT")    # in UTC
-as.POSIXct(z, origin = ISOdatetime(1960,1,1,0,0,0)) # local
-ISOdatetime(1960,1,1,0,0,0) + z                   # local
 
 ## SPSS dates (R-help 2006-02-16)
 z <- c(10485849600, 10477641600, 10561104000, 10562745600)

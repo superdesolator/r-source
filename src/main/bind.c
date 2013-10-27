@@ -96,11 +96,19 @@ AnswerType(SEXP x, int recurse, int usenames, struct BindData *data, SEXP call)
 	data->ans_flags |= 128;
 	data->ans_length += XLENGTH(x);
 	break;
+
+#ifdef DO_C_Symbol
+/* new case : */
+    case SYMSXP:
+    case LANGSXP:
+	data->ans_flags |= 512; /* as.expression() implicitly */
+	data->ans_length += 1;
+	break;
+#endif
     case VECSXP:
     case EXPRSXP:
 	if (recurse) {
-	    R_xlen_t i, n;
-	    n = xlength(x);
+	    R_xlen_t i, n = xlength(x);
 	    if (usenames && !data->ans_nnames &&
 		!isNull(getAttrib(x, R_NamesSymbol)))
 		data->ans_nnames = 1;
@@ -371,7 +379,7 @@ RealAnswer(SEXP x, struct BindData *data, SEXP call)
 static void
 ComplexAnswer(SEXP x, struct BindData *data, SEXP call)
 {
-    R_xlen_t i; 
+    R_xlen_t i;
     int xi;
     switch(TYPEOF(x)) {
     case NILSXP:
@@ -476,12 +484,14 @@ static SEXP NewBase(SEXP base, SEXP tag)
     base = EnsureString(base);
     tag = EnsureString(tag);
     if (*CHAR(base) && *CHAR(tag)) { /* test of length */
+	const void *vmax = vmaxget();
 	const char *sb = translateCharUTF8(base), *st = translateCharUTF8(tag);
 	cbuf = R_AllocStringBuffer(strlen(st) + strlen(sb) + 1, &cbuff);
 	sprintf(cbuf, "%s.%s", sb, st);
 	/* This isn't strictly correct as we do not know that all the
 	   components of the name were correctly translated. */
 	ans = mkCharCE(cbuf, CE_UTF8);
+	vmaxset(vmax);
     }
     else if (*CHAR(tag)) {
 	ans = tag;
@@ -504,6 +514,8 @@ static SEXP NewName(SEXP base, SEXP tag, int seqno)
 
     SEXP ans;
     char *cbuf;
+    const void *vmax = vmaxget();
+
     base = EnsureString(base);
     tag = EnsureString(tag);
     if (*CHAR(base) && *CHAR(tag)) {
@@ -529,6 +541,7 @@ static SEXP NewName(SEXP base, SEXP tag, int seqno)
 	}
     }
     else ans = R_BlankString;
+    vmaxset(vmax);
     return ans;
 }
 
@@ -824,7 +837,7 @@ SEXP attribute_hidden do_c_dflt(SEXP call, SEXP op, SEXP args, SEXP env)
 SEXP attribute_hidden do_unlist(SEXP call, SEXP op, SEXP args, SEXP env)
 {
     SEXP ans, t;
-    int mode, recurse, usenames;
+    int mode;
     R_xlen_t i, n = 0;
     struct BindData data;
     struct NameData nameData;
@@ -842,8 +855,9 @@ SEXP attribute_hidden do_unlist(SEXP call, SEXP op, SEXP args, SEXP env)
     /* by an optional "recursive" argument. */
 
     PROTECT(args = CAR(ans));
-    recurse = asLogical(CADR(ans));
-    usenames = asLogical(CADDR(ans));
+    int recurse = asLogical(CADR(ans));
+    int usenames = asLogical(CADDR(ans));
+    int lenient = TRUE; // was (implicitly!) FALSE  up to R 3.0.1
 
     /* Determine the type of the returned value. */
     /* The strategy here is appropriate because the */
@@ -874,7 +888,7 @@ SEXP attribute_hidden do_unlist(SEXP call, SEXP op, SEXP args, SEXP env)
     }
     else {
 	UNPROTECT(1);
-	if (isVector(args)) return args;
+	if (lenient || isVector(args)) return args;
 	else error(_("argument not a list"));
     }
 
@@ -1092,9 +1106,11 @@ SEXP attribute_hidden do_bind(SEXP call, SEXP op, SEXP args, SEXP env)
     case RAWSXP:
 	break;
 	/* we don't handle expressions: we could, but coercion of a matrix
-	   to an expression is not ideal */
+	   to an expression is not ideal.
+	   FIXME?  had  cbind(y ~ x, 1) work using lists, before */
     default:
-	error(_("cannot create a matrix from these types"));
+	error(_("cannot create a matrix from type '%s'"),
+	      type2char(mode));
     }
 
     if (PRIMVAL(op) == 1)
@@ -1224,7 +1240,8 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
     else if (mode == VECSXP) {
 	for (t = args; t != R_NilValue; t = CDR(t)) {
 	    u = PRVALUE(CAR(t));
-	    if (isMatrix(u) || length(u) >= lenmin) {
+	    int umatrix = isMatrix(u); /* might be lost in coercion to VECSXP */
+	    if (umatrix || length(u) >= lenmin) {
 		/* we cannot assume here that coercion will work */
 		switch(TYPEOF(u)) {
 		case NILSXP:
@@ -1240,7 +1257,7 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 		    PROTECT(u = coerceVector(u, mode));
 		    k = LENGTH(u);
 		    if (k > 0) {
-			idx = (!isMatrix(u)) ? rows : k;
+			idx = (!umatrix) ? rows : k;
 			for (i = 0; i < idx; i++)
 			    SET_VECTOR_ELT(result, n++,
 					   duplicate(VECTOR_ELT(u, i % k)));
@@ -1297,7 +1314,7 @@ static SEXP cbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
 		else if (TYPEOF(u) == REALSXP) {
 		    for (i = 0; i < idx; i++)
 			REAL(result)[n++] = REAL(u)[i % k];
-		} 
+		}
 		else { /* RAWSXP */
 		    /* FIXME: I'm not sure what the author intended when the sequence was
 		       defined as raw < logical -- it is possible to represent logical as
@@ -1474,10 +1491,11 @@ static SEXP rbind(SEXP call, SEXP args, SEXPTYPE mode, SEXP rho,
     else if (mode == VECSXP) {
 	for (t = args; t != R_NilValue; t = CDR(t)) {
 	    u = PRVALUE(CAR(t));
-	    if (isMatrix(u) || length(u) >= lenmin) {
+ 	    int umatrix = isMatrix(u), urows = umatrix ? nrows(u) : 1; /* coercing to VECSXP will lose these. PR#15468 */
+	    if (umatrix || length(u) >= lenmin) {
 		PROTECT(u = coerceVector(u, mode));
 		k = LENGTH(u);
-		idx = (isMatrix(u)) ? nrows(u) : (k > 0);
+		idx = umatrix ? urows : (k > 0);
 		for (i = 0; i < idx; i++)
 		    for (j = 0; j < cols; j++)
 		      SET_VECTOR_ELT(result, i + n + (j * rows),

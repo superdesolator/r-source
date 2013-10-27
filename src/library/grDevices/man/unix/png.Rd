@@ -1,6 +1,6 @@
 % File src/library/grDevices/man/unix/png.Rd
 % Part of the R package, http://www.R-project.org
-% Copyright 1995-2012 R Core Team
+% Copyright 1995-2013 R Core Team
 % Distributed under GPL 2 or later
 
 \name{png}
@@ -67,7 +67,7 @@ tiff(filename = "Rplot\%03d.tiff",
     section in the help for \code{\link{X11}}.}
 
   \item{type}{character string, one of \code{"Xlib"} or \code{"quartz"}
-    (some Mac OS X builds) or \code{"cairo"}.  The latter will only be
+    (some OS X builds) or \code{"cairo"}.  The latter will only be
     available if the system was compiled with support for cairo --
     otherwise \code{"Xlib"} will be used.  The default is set by
     \code{\link{getOption}("bitmapType")} -- the \sQuote{out of the box}
@@ -75,9 +75,10 @@ tiff(filename = "Rplot\%03d.tiff",
     otherwise \code{"Xlib"}.}
 
   \item{antialias}{for \code{type = "cairo"}, giving the type of
-    anti-aliasing (if any) to be used.  See \code{\link{X11}}.  The
-    default is set by \code{\link{X11.options}}.  Also for \code{type =
-    "quartz"}, where antialiasing is used unless \code{antialias = "none"}.}
+    anti-aliasing (if any) to be used for fonts and lines (but not
+    fills). See \code{\link{X11}}.  The default is set by
+    \code{\link{X11.options}}.  Also for \code{type = "quartz"}, where
+    antialiasing is used unless \code{antialias = "none"}.}
 }
 \details{
   Plots in PNG and JPEG format can easily be converted to many other
@@ -110,7 +111,7 @@ tiff(filename = "Rplot\%03d.tiff",
   "Xlib"} they may not be usable unless the X11 display is available to
   the owner of the \R process.  \code{type = "cairo"} requires cairo 1.2
   or later.  \code{type = "quartz"} uses the \code{\link{quartz}} device
-  and so is only available where that is (on some Mac OS X builds: see
+  and so is only available where that is (on some OS X builds: see
   \code{\link{capabilities}("aqua")}).
 
   By default no resolution is recorded in the file.  Viewers will often
@@ -158,7 +159,7 @@ tiff(filename = "Rplot\%03d.tiff",
     \item On platforms with support for X11, plotting to a hidden X11
     display.
 
-    \item On Mac OS X when working at the console and when \R is
+    \item On OS X when working at the console and when \R is
     compiled with suitable support, using Apple's Quartz plotting
     system.
 
@@ -218,7 +219,7 @@ tiff(filename = "Rplot\%03d.tiff",
 
 \examples{
 ## these examples will work only if the devices are available
-## and cairo or an X11 display or a Mac OS X display is available.
+## and cairo or an X11 display or an OS X display is available.
 
 ## copy current plot to a (large) PNG file
 \dontrun{dev.print(png, file = "myplot.png", width = 1024, height = 768)}

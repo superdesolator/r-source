@@ -3,6 +3,8 @@
 #
 #  Copyright (C) 1995-2013 The R Core Team
 #
+# NB: also copyright date in Usage.
+#
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -39,6 +41,22 @@ massageExamples <-
     cat(lines, sep = "\n", file = out)
     if(.Platform$OS.type == "windows")
         cat("options(pager = \"console\")\n", file = out)
+    if(addTiming) {
+        ## adding timings
+        cat("base::assign(\".ExTimings\", \"", pkg,
+            "-Ex.timings\", pos = 'CheckExEnv')\n", sep="", file = out)
+        cat("base::cat(\"name\\tuser\\tsystem\\telapsed\\n\", file=base::get(\".ExTimings\", pos = 'CheckExEnv'))\n", file = out)
+        ## a package left OutDec = "," at the end of an example
+        cat("base::assign(\".format_ptime\",",
+            "function(x) {",
+            "  if(!is.na(x[4L])) x[1L] <- x[1L] + x[4L]",
+            "  if(!is.na(x[5L])) x[2L] <- x[2L] + x[5L]",
+            "  options(OutDec = '.')",
+            "  format(x[1L:3L], digits = 7L)",
+            "},",
+            "pos = 'CheckExEnv')\n", sep = "\n", file = out)
+        cat("### * </HEADER>\n", file = out)
+    }
 
     if(pkg == "tcltk") {
         if(capabilities("tcltk")) cat("require('tcltk')\n\n", file = out)
@@ -48,19 +66,6 @@ massageExamples <-
 
     cat("base::assign(\".oldSearch\", base::search(), pos = 'CheckExEnv')\n", file = out)
     ## cat("assign(\".oldNS\", loadedNamespaces(), pos = 'CheckExEnv')\n", file = out)
-    if(addTiming) {
-        ## adding timings
-        cat("base::assign(\".ExTimings\", \"", pkg,
-            "-Ex.timings\", pos = 'CheckExEnv')\n", sep="", file = out)
-        cat("base::cat(\"name\\tuser\\tsystem\\telapsed\\n\", file=base::get(\".ExTimings\", pos = 'CheckExEnv'))\n", file = out)
-        cat("base::assign(\".format_ptime\",",
-            "function(x) {",
-            "  if(!is.na(x[4L])) x[1L] <- x[1L] + x[4L]",
-            "  if(!is.na(x[5L])) x[2L] <- x[2L] + x[5L]",
-            "  format(x[1L:3L])",
-            "},",
-            "pos = 'CheckExEnv')\n", sep = "\n", file = out)
-    }
     for(file in files) {
         nm <- sub("\\.R$", "", basename(file))
         ## make a syntactic name out of the filename
@@ -100,7 +105,7 @@ massageExamples <-
         }
 
         if(addTiming) {
-            cat("\nbase::assign(\".dptime\", (proc.time() - get(\".ptime\", pos = \"CheckExEnv\")), pos = \"CheckExEnv\")\n", file = out)
+            cat("base::assign(\".dptime\", (proc.time() - get(\".ptime\", pos = \"CheckExEnv\")), pos = \"CheckExEnv\")\n", file = out)
             cat("base::cat(\"", nm, "\", base::get(\".format_ptime\", pos = 'CheckExEnv')(get(\".dptime\", pos = \"CheckExEnv\")), \"\\n\", file=base::get(\".ExTimings\", pos = 'CheckExEnv'), append=TRUE, sep=\"\\t\")\n", sep = "", file = out)
         }
         if(have_par)
@@ -115,7 +120,8 @@ massageExamples <-
 }
 
 ## compares 2 files
-Rdiff <- function(from, to, useDiff = FALSE, forEx = FALSE, nullPointers=TRUE, Log=FALSE)
+Rdiff <- function(from, to, useDiff = FALSE, forEx = FALSE,
+                  nullPointers=TRUE, Log = FALSE)
 {
     clean <- function(txt)
     {
@@ -125,18 +131,26 @@ Rdiff <- function(from, to, useDiff = FALSE, forEx = FALSE, nullPointers=TRUE, L
                               txt, perl = TRUE, useBytes = TRUE)) &&
            length(bot <- grep("quit R.$", txt, perl = TRUE, useBytes = TRUE)))
             txt <- txt[-(top[1L]:bot[1L])]
+        ## for massageExamples()
+        ll <- grep("</HEADER>", txt, fixed = TRUE, useBytes = TRUE)
+        if(length(ll)) txt <- txt[-seq_len(max(ll))]
+        ll <- grep("<FOOTER>", txt, fixed = TRUE, useBytes = TRUE)
+        if(length(ll)) txt <- txt[seq_len(max(ll) - 1L)]
         ## remove BATCH footer
         nl <- length(txt)
-        if(nl > 3L && grepl("^> proc.time()", txt[nl-2L])) txt <- txt[1:(nl-3L)]
+        if(nl > 3L && grepl("^> proc.time\\(\\)", txt[nl-2L])) txt <- txt[1:(nl-3L)]
         if (nullPointers)
         ## remove pointer addresses from listings
             txt <- gsub("<(environment|bytecode|pointer|promise): [x[:xdigit:]]+>", "<\\1: 0>", txt)
         ## regularize fancy quotes.  First UTF-8 ones:
         txt <- gsub("(\xe2\x80\x98|\xe2\x80\x99)", "'", txt,
                       perl = TRUE, useBytes = TRUE)
+        txt <- gsub("(\xe2\x80\x9c|\xe2\x80\x9d)", '"', txt,
+                      perl = TRUE, useBytes = TRUE)
         if(.Platform$OS.type == "windows") {
             ## not entirely safe ...
-            txt <- gsub("(\x93|\x94)", "'", txt, perl = TRUE, useBytes = TRUE)
+            txt <- gsub("(\x91|\x92)", "'", txt, perl = TRUE, useBytes = TRUE)
+            txt <- gsub("(\x93|\x94)", '"', txt, perl = TRUE, useBytes = TRUE)
             txt <- txt[!grepl('options(pager = "console")', txt,
                               fixed = TRUE, useBytes = TRUE)]
         }
@@ -153,6 +167,9 @@ Rdiff <- function(from, to, useDiff = FALSE, forEx = FALSE, nullPointers=TRUE, L
     right <- clean(readLines(to))
     if (forEx) {
         left <- clean2(left)
+        ## remove lines from R CMD check --timings
+        left <- grep("[.](format_|)ptime", left, value = TRUE,
+                     invert = TRUE, useBytes = TRUE)
         right <- clean2(right)
     }
     if (!useDiff && (length(left) == length(right))) {
@@ -187,7 +204,7 @@ Rdiff <- function(from, to, useDiff = FALSE, forEx = FALSE, nullPointers=TRUE, L
             tf <- tempfile()
             status <- system2("diff", c("-bw", shQuote(a), shQuote(b)),
                               stdout = tf, stderr = tf)
-            list(status=status, out=c(out, readLines(tf)))
+            list(status = status, out = c(out, readLines(tf)))
         } else system(paste("diff -bw", shQuote(a), shQuote(b)))
     }
 }
@@ -220,7 +237,7 @@ testInstalledPackages <-
             else warning(msg, domain = NA, call. = FALSE, immediate. = TRUE)
         }
     }
-    return(invisible(status))
+    invisible(status)
 }
 
 testInstalledPackage <-
@@ -291,7 +308,7 @@ testInstalledPackage <-
         this <- paste(pkg, "tests", sep = "-")
         unlink(this, recursive = TRUE)
         dir.create(this)
-        ## system(paste("cp -pr", file.path(d, "*"), this))
+        ## system(paste("cp -pR", file.path(d, "*"), this))
         file.copy(Sys.glob(file.path(d, "*")), this, recursive = TRUE)
         setwd(this)
         message(gettextf("Running specific tests for package %s",
@@ -500,7 +517,7 @@ testInstalledBasic <- function(scope = c("basic", "devel", "both"))
                 stop("file ", sQuote(f), " not found", domain = NA)
             message("creating ", sQuote(f), domain = NA)
             ## FIXME: this creates an extra trailing space compared to
-            ## .Rin.R rule
+            ## the .Rin.R rule
             cmd <- paste(shQuote(file.path(R.home("bin"), "R")),
                          "--vanilla --slave -f", fin)
             if (system(cmd))
@@ -512,11 +529,13 @@ testInstalledBasic <- function(scope = c("basic", "devel", "both"))
         cmd <- paste(shQuote(file.path(R.home("bin"), "R")),
                      "CMD BATCH --vanilla --no-timing",
                      shQuote(f), shQuote(outfile))
-        extra <- paste("LANGUAGE=C", "R_DEFAULT_PACKAGES=", "SRCDIR=.")
+        extra <- paste("LANGUAGE=en", "LC_COLLATE=C",
+                       "R_DEFAULT_PACKAGES=", "SRCDIR=.")
         if (inC) extra <- paste(extra,  "LC_ALL=C")
         if (.Platform$OS.type == "windows") {
             Sys.setenv(LANGUAGE="C")
             Sys.setenv(R_DEFAULT_PACKAGES="")
+            Sys.setenv(LC_COLLATE="C")
             Sys.setenv(SRCDIR=".")
             ## ignore inC and hope
         } else cmd <- paste(extra, cmd)
@@ -664,7 +683,7 @@ detachPackages <- function(pkgs, verbose = TRUE)
                 R.version[["major"]], ".",  R.version[["minor"]],
                 " (r", R.version[["svn rev"]], ")\n", sep = "")
             cat("",
-                "Copyright (C) 2000-2010 The R Core Team.",
+                "Copyright (C) 2000-2013 The R Core Team.",
                 "This is free software; see the GNU General Public License version 2",
                 "or later for copying conditions.  There is NO warranty.",
                 sep = "\n")

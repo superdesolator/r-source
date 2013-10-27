@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1998-2012   The R Core Team
+ *  Copyright (C) 1998-2013   The R Core Team
  *  Copyright (C) 2002-2005  The R Foundation
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -134,7 +134,7 @@ static const char *R_PromptString(int browselevel, int type)
     else {
 	if(type == 1) {
 	    if(browselevel) {
-		sprintf(BrowsePrompt, "Browse[%d]> ", browselevel);
+		snprintf(BrowsePrompt, 20, "Browse[%d]> ", browselevel);
 		return BrowsePrompt;
 	    }
 	    return CHAR(STRING_ELT(GetOption1(install("prompt")), 0));
@@ -315,7 +315,6 @@ static unsigned char DLLbuf[CONSOLE_BUFFER_SIZE+1], *DLLbufp;
 
 void R_ReplDLLinit(void)
 {
-    R_IoBufferInit(&R_ConsoleIob);
     SETJMP(R_Toplevel.cjmpbuf);
     R_GlobalContext = R_ToplevelContext = R_SessionContext = &R_Toplevel;
     R_IoBufferWriteReset(&R_ConsoleIob);
@@ -757,10 +756,10 @@ void setup_Rmainloop(void)
 #ifdef LC_MONETARY
     if(!setlocale(LC_MONETARY, ""))
 	snprintf(deferred_warnings[ndeferred_warnings++], 250,
-		 "Setting LC_PAPER failed, using \"C\"\n");
+		 "Setting LC_MONETARY failed, using \"C\"\n");
 #endif
 #ifdef LC_PAPER
-    if(!setlocale(LC_MONETARY, ""))
+    if(!setlocale(LC_PAPER, ""))
 	snprintf(deferred_warnings[ndeferred_warnings++], 250,
 		 "Setting LC_PAPER failed, using \"C\"\n");
 #endif
@@ -847,7 +846,7 @@ void setup_Rmainloop(void)
        user's profile (in that order).  If there is an error, we
        drop through to further processing.
     */
-
+    R_IoBufferInit(&R_ConsoleIob);
     R_LoadProfile(R_OpenSysInitFile(), baseEnv);
     /* These are the same bindings, so only lock them once */
     R_LockEnvironment(R_BaseNamespace, TRUE);
@@ -980,7 +979,6 @@ void run_Rmainloop(void)
 {
     /* Here is the real R read-eval-loop. */
     /* We handle the console until end-of-file. */
-    R_IoBufferInit(&R_ConsoleIob);
     SETJMP(R_Toplevel.cjmpbuf);
     R_GlobalContext = R_ToplevelContext = R_SessionContext = &R_Toplevel;
     R_ReplConsole(R_GlobalEnv, 0, 0);
@@ -1263,8 +1261,8 @@ Rf_addTaskCallback(R_ToplevelCallback cb, void *data,
     }
 
     if(!name) {
-	char buf[5];
-	sprintf(buf, "%d", which+1);
+	char buf[10];
+	snprintf(buf, 10, "%d", which+1);
 	el->name = strdup(buf);
     } else
 	el->name = strdup(name);

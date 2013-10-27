@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -141,7 +141,7 @@ SEXP asChar(SEXP x)
     if (XLENGTH(x) >= 1) {
 	if (isVectorAtomic(x)) {
 	    int w, d, e, wi, di, ei;
-	    char buf[MAXELTSIZE];  /* probably 100 would suffice */
+	    char buf[MAXELTSIZE];  /* Probably 100 would suffice */
 
 	    switch (TYPEOF(x)) {
 	    case LGLSXP:
@@ -155,7 +155,7 @@ SEXP asChar(SEXP x)
 	    case INTSXP:
 		if (INTEGER(x)[0] == NA_INTEGER)
 		    return NA_STRING;
-		sprintf(buf, "%d", INTEGER(x)[0]);
+		snprintf(buf, MAXELTSIZE, "%d", INTEGER(x)[0]);
 		return mkChar(buf);
 	    case REALSXP:
 		PrintDefaults();
@@ -808,24 +808,26 @@ SEXP attribute_hidden do_dirname(SEXP call, SEXP op, SEXP args, SEXP rho)
 	if (STRING_ELT(s, i) == NA_STRING)
 	    SET_STRING_ELT(ans, i, NA_STRING);
 	else {
+	    memset(sp, 0, 4*PATH_MAX);
 	    pp = filenameToWchar(STRING_ELT(s, i), TRUE);
 	    if (wcslen(pp) > PATH_MAX - 1)
 		error(_("path too long"));
-	    wcscpy (buf, pp);
-	    R_wfixslash(buf);
-	    /* remove trailing file separator(s) */
-	    while ( *(p = buf + wcslen(buf) - 1) == L'/'  && p > buf
-		    && (p > buf+2 || *(p-1) != L':')) *p = L'\0';
-	    p = wcsrchr(buf, L'/');
-	    if(p == NULL) wcscpy(buf, L".");
-	    else {
-		while(p > buf && *p == L'/'
-		      /* this covers both drives and network shares */
-		      && (p > buf+2 || *(p-1) != L':')) --p;
-		p[1] = L'\0';
+	    if (wcslen(pp)) {
+		wcscpy (buf, pp);
+		R_wfixslash(buf);
+		/* remove trailing file separator(s) */
+		while ( *(p = buf + wcslen(buf) - 1) == L'/'  && p > buf
+			&& (p > buf+2 || *(p-1) != L':')) *p = L'\0';
+		p = wcsrchr(buf, L'/');
+		if(p == NULL) wcscpy(buf, L".");
+		else {
+		    while(p > buf && *p == L'/'
+			  /* this covers both drives and network shares */
+			  && (p > buf+2 || *(p-1) != L':')) --p;
+		    p[1] = L'\0';
+		}
+		wcstoutf8(sp, buf, 4*wcslen(buf)+1);
 	    }
-	    memset(sp, 0, 4*PATH_MAX);
-	    wcstoutf8(sp, buf, 4*wcslen(buf)+1);
 	    SET_STRING_ELT(ans, i, mkCharCE(sp, CE_UTF8));
 	}
     }
@@ -851,16 +853,19 @@ SEXP attribute_hidden do_dirname(SEXP call, SEXP op, SEXP args, SEXP rho)
 	    pp = R_ExpandFileName(translateChar(STRING_ELT(s, i)));
 	    if (strlen(pp) > PATH_MAX - 1)
 		error(_("path too long"));
-	    strcpy (buf, pp);
-	    /* remove trailing file separator(s) */
-	    while ( *(p = buf + strlen(buf) - 1) == fsp  && p > buf) *p = '\0';
-	    p = Rf_strrchr(buf, fsp);
-	    if(p == NULL)
-		strcpy(buf, ".");
-	    else {
-		while(p > buf && *p == fsp) --p;
-		p[1] = '\0';
-	    }
+	    size_t ll = strlen(pp);
+	    if (ll) { // svMisc calls this with ""
+		strcpy (buf, pp);
+		/* remove trailing file separator(s) */
+		while ( *(p = buf + ll - 1) == fsp  && p > buf) *p = '\0';
+		p = Rf_strrchr(buf, fsp);
+		if(p == NULL)
+		    strcpy(buf, ".");
+		else {
+		    while(p > buf && *p == fsp) --p;
+		    p[1] = '\0';
+		}
+	    } else buf[0] = '\0';
 	    SET_STRING_ELT(ans, i, mkChar(buf));
 	}
     }
@@ -1394,7 +1399,9 @@ void F77_SYMBOL(rchkusr)(void)
     R_CheckUserInterrupt();
 }
 
-/* Return a copy of a string using memory from R_alloc */
+/* Return a copy of a string using memory from R_alloc.
+   NB: caller has to manage R_alloc stack.  Used in platform.c
+*/
 char *acopy_string(const char *in)
 {
     char *out;
@@ -1805,6 +1812,7 @@ SEXP attribute_hidden do_ICUset(SEXP call, SEXP op, SEXP args, SEXP rho)
 }
 
 
+/* Caller has to manage the R_alloc stack */
 /* NB: strings can have equal collation weight without being identical */
 attribute_hidden
 int Scollate(SEXP a, SEXP b)
@@ -2158,6 +2166,7 @@ void str_signif(void *x, R_xlen_t n, const char *type, int width, int digits,
     double xx;
     int iex;
     size_t j, len_flag = strlen(flag);
+    const void *vmax = vmaxget();
 
     char *f0  =	 R_alloc((size_t) do_fg ? 1+1+len_flag+3 : 1, sizeof(char));
     char *form = R_alloc((size_t) 1+1+len_flag+3 + strlen(format),
@@ -2265,4 +2274,5 @@ void str_signif(void *x, R_xlen_t n, const char *type, int width, int digits,
 	} else
 	    error("'type' must be \"real\" for this format");
     }
+    vmaxset(vmax);
 }

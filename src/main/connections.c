@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 2000-12   The R Core Team.
+ *  Copyright (C) 2000-13   The R Core Team.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -316,10 +316,11 @@ int vasprintf(char **strp, const char *fmt, va_list ap);
 # define BUFSIZE 10000
 int dummy_vfprintf(Rconnection con, const char *format, va_list ap)
 {
+    R_CheckStack2(BUFSIZE); // prudence
     char buf[BUFSIZE], *b = buf;
     int res;
-    const void *vmax = vmaxget();
-    int usedRalloc = FALSE, usedVasprintf = FALSE;
+    const void *vmax = NULL; /* -Wall*/
+    int usedVasprintf = FALSE;
     va_list aq;
 
     va_copy(aq, ap);
@@ -336,14 +337,14 @@ int dummy_vfprintf(Rconnection con, const char *format, va_list ap)
     }
 #else
     if(res >= BUFSIZE) { /* res is the desired output length */
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	/* apparently some implementations count short,
 	   <http://unixpapa.com/incnote/stdio.html>
 	   so add some margin here */
 	b = R_alloc(res + 101, sizeof(char));
-	vsnprintf(b, res+100, format, ap);
+	vsnprintf(b, res + 100, format, ap);
     } else if(res < 0) { /* just a failure indication */
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	b = R_alloc(10*BUFSIZE, sizeof(char));
 	res = vsnprintf(b, 10*BUFSIZE, format, ap);
 	if (res < 0) {
@@ -378,7 +379,7 @@ int dummy_vfprintf(Rconnection con, const char *format, va_list ap)
 				       zero-length input */
     } else
 	con->write(b, 1, res, con);
-    if(usedRalloc) vmaxset(vmax);
+    if(vmax) vmaxset(vmax);
     if(usedVasprintf) free(b);
     return res;
 }
@@ -1231,8 +1232,8 @@ static Rboolean gzfile_open(Rconnection con)
 
     strcpy(mode, con->mode);
     /* Must open as binary */
-    if(strchr(con->mode, 'w')) sprintf(mode, "wb%1d", gzcon->compress);
-    else if (con->mode[0] == 'a') sprintf(mode, "ab%1d", gzcon->compress);
+    if(strchr(con->mode, 'w')) snprintf(mode, 6, "wb%1d", gzcon->compress);
+    else if (con->mode[0] == 'a') snprintf(mode, 6, "ab%1d", gzcon->compress);
     else strcpy(mode, "rb");
     errno = 0; /* precaution */
     fp = R_gzopen(R_ExpandFileName(con->description), mode);
@@ -2500,6 +2501,7 @@ static void text_init(Rconnection con, SEXP text, int type)
     size_t nchars = 0; /* -Wall */
     double dnc = 0.0;
     Rtextconn this = con->private;
+    const void *vmax = vmaxget();
 
     for(i = 0; i < nlines; i++)
 	dnc += 
@@ -2524,6 +2526,7 @@ static void text_init(Rconnection con, SEXP text, int type)
     }
     this->nchars = nchars;
     this->cur = this->save = 0;
+    vmaxset(vmax);
 }
 
 static Rboolean text_open(Rconnection con)
@@ -2644,8 +2647,8 @@ static int text_vfprintf(Rconnection con, const char *format, va_list ap)
 {
     Routtextconn this = con->private;
     char buf[BUFSIZE], *b = buf, *p, *q;
-    const void *vmax = vmaxget();
-    int res = 0, usedRalloc = FALSE, buffree,
+    const void *vmax = NULL;
+    int res = 0, buffree,
 	already = (int) strlen(this->lastline); // we do not allow longer lines
     SEXP tmp;
 
@@ -2665,14 +2668,14 @@ static int text_vfprintf(Rconnection con, const char *format, va_list ap)
     }
     va_end(aq);
     if(res >= buffree) { /* res is the desired output length */
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	b = R_alloc(res + already + 1, sizeof(char));
 	strcpy(b, this->lastline);
 	p = b + already;
 	vsprintf(p, format, ap);
     } else if(res < 0) { /* just a failure indication */
 #define NBUFSIZE (already + 100*BUFSIZE)
-	usedRalloc = TRUE;
+	vmax = vmaxget();
 	b = R_alloc(NBUFSIZE, sizeof(char));
 	strncpy(b, this->lastline, NBUFSIZE);
 	*(b + NBUFSIZE - 1) = '\0';
@@ -2725,7 +2728,7 @@ static int text_vfprintf(Rconnection con, const char *format, va_list ap)
 	    break;
 	}
     }
-    if(usedRalloc) vmaxset(vmax);
+    if(vmax) vmaxset(vmax);
     return res;
 }
 
@@ -4962,7 +4965,7 @@ static Rboolean gzcon_open(Rconnection con)
     } else {
 	/* write a header */
 	char head[11];
-	sprintf(head, "%c%c%c%c%c%c%c%c%c%c", gz_magic[0], gz_magic[1],
+	snprintf(head, 11, "%c%c%c%c%c%c%c%c%c%c", gz_magic[0], gz_magic[1],
 		Z_DEFLATED, 0 /*flags*/, 0,0,0,0 /*time*/, 0 /*xflags*/,
 		OS_CODE);
 	icon->write(head, 1, 10, icon);
@@ -5194,7 +5197,7 @@ SEXP attribute_hidden do_gzcon(SEXP call, SEXP op, SEXP args, SEXP rho)
 	error(_("allocation of 'gzcon' connection failed"));
     }
     strcpy(new->class, "gzcon");
-    sprintf(description, "gzcon(%s)", incon->description);
+    snprintf(description, 1000, "gzcon(%s)", incon->description);
     new->description = (char *) malloc(strlen(description) + 1);
     if(!new->description) {
 	free(new->class); free(new);
@@ -5255,9 +5258,12 @@ static unsigned int uiSwap (unsigned int x)
 #define uiSwap(x) (x)
 #endif
 
+/* These are all hidden and used only in serialize.c, 
+   so managing R_alloc stack is prudence. */
 attribute_hidden
 SEXP R_compress1(SEXP in)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen;
     uLong outlen;
     int res;
@@ -5275,12 +5281,14 @@ SEXP R_compress1(SEXP in)
     if(res != Z_OK) error("internal error %d in R_compress1", res);
     ans = allocVector(RAWSXP, outlen + 4);
     memcpy(RAW(ans), buf, outlen + 4);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
-SEXP R_decompress1(SEXP in)
+SEXP R_decompress1(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     uLong inlen, outlen;
     int res;
     Bytef *buf;
@@ -5293,15 +5301,21 @@ SEXP R_decompress1(SEXP in)
     outlen = (uLong) uiSwap(*((unsigned int *) p));
     buf = (Bytef *) R_alloc(outlen, sizeof(Bytef));
     res = uncompress(buf, &outlen, (Bytef *)(p + 4), inlen - 4);
-    if(res != Z_OK) error("internal error %d in R_decompress1", res);
+    if(res != Z_OK) {
+	warning("internal error %d in R_decompress1", res);
+	*err = TRUE;
+	return R_NilValue;
+    }
     ans = allocVector(RAWSXP, outlen);
     memcpy(RAW(ans), buf, outlen);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
 SEXP R_compress2(SEXP in)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     int res;
     char *buf;
@@ -5327,12 +5341,14 @@ SEXP R_compress2(SEXP in)
     }
     ans = allocVector(RAWSXP, outlen + 5);
     memcpy(RAW(ans), buf, outlen + 5);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
-SEXP R_decompress2(SEXP in)
+SEXP R_decompress2(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     int res;
     char *buf, *p = (char *) RAW(in), type;
@@ -5346,17 +5362,30 @@ SEXP R_decompress2(SEXP in)
     type = p[4];
     if (type == '2') {
 	res = BZ2_bzBuffToBuffDecompress(buf, &outlen, p + 5, inlen - 5, 0, 0);
-	if(res != BZ_OK) error("internal error %d in R_decompress2", res);
+	if(res != BZ_OK) {
+	    warning("internal error %d in R_decompress2", res);
+	    *err = TRUE;
+	    return R_NilValue;
+	}
     } else if (type == '1') {
 	uLong outl;
 	res = uncompress((unsigned char *) buf, &outl,
 			 (Bytef *)(p + 5), inlen - 5);
-	if(res != Z_OK) error("internal error %d in R_decompress1");
+	if(res != Z_OK) {
+	    warning("internal error %d in R_decompress1");
+	    *err = TRUE;
+	    return R_NilValue;
+	}
     } else if (type == '0') {
 	buf = p + 5;
-    } else error("unknown type in R_decompress2");
+    } else {
+	warning("unknown type in R_decompress2");
+	*err = TRUE;
+	return R_NilValue;
+    }
     ans = allocVector(RAWSXP, outlen);
     memcpy(RAW(ans), buf, outlen);
+    vmaxset(vmax);
     return ans;
 }
 
@@ -5426,8 +5455,9 @@ static void init_filters(void)
 }
 
 attribute_hidden
-SEXP R_compress3(SEXP in)
+SEXP R_compress3(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     unsigned char *buf;
     SEXP ans;
@@ -5462,12 +5492,14 @@ SEXP R_compress3(SEXP in)
     /* printf("compressed %d to %d\n", inlen, outlen); */
     ans = allocVector(RAWSXP, outlen + 5);
     memcpy(RAW(ans), buf, outlen + 5);
+    vmaxset(vmax);
     return ans;
 }
 
 attribute_hidden
-SEXP R_decompress3(SEXP in)
+SEXP R_decompress3(SEXP in, Rboolean *err)
 {
+    const void *vmax = vmaxget();
     unsigned int inlen, outlen;
     unsigned char *buf, *p = RAW(in), type = p[4];
     SEXP ans;
@@ -5483,31 +5515,50 @@ SEXP R_decompress3(SEXP in)
 	lzma_ret ret;
 	init_filters();
 	ret = lzma_raw_decoder(&strm, filters);
-	if (ret != LZMA_OK) error("internal error %d in R_decompress3", ret);
+	if (ret != LZMA_OK) {
+	    warning("internal error %d in R_decompress3", ret);
+	    *err = TRUE;
+	    return R_NilValue;
+	}
 	strm.next_in = p + 5;
 	strm.avail_in = inlen - 5;
 	strm.next_out = buf;
 	strm.avail_out = outlen;
 	ret = lzma_code(&strm, LZMA_RUN);
-	if (ret != LZMA_OK && (strm.avail_in > 0))
-	    error("internal error %d in R_decompress3 %d",
-		  ret, strm.avail_in);
+	if (ret != LZMA_OK && (strm.avail_in > 0)) {
+	    warning("internal error %d in R_decompress3 %d",
+		    ret, strm.avail_in);
+	    *err = TRUE;
+	    return R_NilValue;
+	}
 	lzma_end(&strm);
     } else if (type == '2') {
 	int res;
 	res = BZ2_bzBuffToBuffDecompress((char *)buf, &outlen,
 					 (char *)(p + 5), inlen - 5, 0, 0);
-	if(res != BZ_OK) error("internal error %d in R_decompress2", res);
+	if(res != BZ_OK) {
+	    warning("internal error %d in R_decompress2", res);
+	    *err = TRUE;
+	    return R_NilValue;
+	}
     } else if (type == '1') {
 	uLong outl; int res;
 	res = uncompress(buf, &outl, (Bytef *)(p + 5), inlen - 5);
-	if(res != Z_OK) error("internal error %d in R_decompress1");
+	if(res != Z_OK) {
+	    warning("internal error %d in R_decompress1");
+	    *err = TRUE;
+	    return R_NilValue;
+	}
     } else if (type == '0') {
 	buf = p + 5;
-    } else error("unknown type in R_decompress3");
-
+    } else {
+	warning("unknown type in R_decompress3");
+	*err = TRUE;
+	return R_NilValue;
+    }
     ans = allocVector(RAWSXP, outlen);
     memcpy(RAW(ans), buf, outlen);
+    vmaxset(vmax);
     return ans;
 }
 

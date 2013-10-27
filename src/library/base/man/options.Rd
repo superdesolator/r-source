@@ -23,27 +23,31 @@ getOption(x, default = NULL)
 %%-- NOTE : Keep the list up-to-date,
 %%-- ====   Consider also the leading comments in ../../../main/options.c
 \arguments{
-  \item{\dots}{any options can be defined, using \code{name = value} or
-    by passing a list of such tagged values.  However, only the ones
-    below are used in base \R.
-    Further, \code{options('name') == options()['name']}, see the example.
+  \item{\dots}{any options can be defined, using \code{name = value}.
+    However, only the ones below are used in base \R.
+    
+    Options can also be passed by giving a single unnamed argument which
+    is a named list.
   }
   \item{x}{a character string holding an option name.}
-
+  
   \item{default}{if the specified option is not set in the options list,
-     this value is returned.  This facilitates retrieving an option and
-     checking whether it is set and setting it separately if not.}
- }
+    this value is returned.  This facilitates retrieving an option and
+    checking whether it is set and setting it separately if not.}
+}
 \details{
   Invoking \code{options()} with no arguments returns a list with the
   current values of the options.  Note that not all options listed below
   are set initially.  To access the value of a single option, one should
-  use \code{getOption("width")}, e.g., rather than
+  use, e.g., \code{getOption("width")} rather than
   \code{options("width")} which is a \emph{list} of length one.
+}
 
-  \code{.Options} also always contains the \code{options()} list (as a
-  pairlist, unsorted), for S compatibility.  Assigning to it will make a
-  local copy and not change the original.
+\note{
+  For compatibility with S there is a visible object \code{.Options} whose
+  value is a pairlist containing  the current \code{options()} (in no
+  particular order).  Assigning to it will make a local copy and not
+  change the original.
 }
 \value{
   For \code{getOption}, the current value set for option \code{x}, or
@@ -306,7 +310,7 @@ getOption(x, default = NULL)
     \item{\code{warn}:}{sets the handling of warning messages.  If
       \code{warn} is negative all warnings are ignored.  If \code{warn}
       is zero (the default) warnings are stored until the top--level
-      function returns.  If fewer than 10 warnings were signalled they
+      function returns.  If 10 or fewer warnings were signalled they
       will be printed otherwise a message saying how many were
       signalled.  An object called \code{last.warning} is
       created and can be printed through the function
@@ -387,7 +391,7 @@ getOption(x, default = NULL)
     \item{\code{bitmapType}:}{(Unix-only) character.  The default type for the
       bitmap devices such as \code{\link{png}}.  Defaults to
       \code{"cairo"} on systems where that is available, or to
-      \code{"quartz"} on Mac OS X where that is available.}
+      \code{"quartz"} on OS X where that is available.}
 #endif
 
     \item{\code{device}:}{a character string giving
@@ -525,7 +529,7 @@ getOption(x, default = NULL)
 
     \item{\code{install.lock}:}{logical: should per-directory package
       locking be used by \code{\link{install.packages}}?  Most useful
-      for binary installs on Mac OS X and Windows, but can be used in a
+      for binary installs on OS X and Windows, but can be used in a
       startup file for source installs \emph{via}
       \command{R CMD \link{INSTALL}}.  For binary installs, can also be
       the character string \code{"pkgloack"}.}
@@ -548,12 +552,12 @@ getOption(x, default = NULL)
       and installed -- see \code{\link{install.packages}}.
 #ifdef windows
       Possible values are \code{"win.binary"} (the default) and
-      \code{"source"}.  Some Mac OS X builds use \code{"mac.binary.leopard"}.
+      \code{"source"}.  Some OS X builds use \code{"mac.binary"}.
 #endif
 #ifdef unix
       Possible values are \code{"source"} (the default except under the
-      CRAN Mac OS X build) and \code{"mac.binary.leopard"}.  Windows
-      uses  \code{"win.binary"}.  (\code{"mac.binary"} and
+      CRAN OS X build) and \code{"mac.binary."}.  Windows
+      uses  \code{"win.binary"}.  (\code{"mac.binary.leopard"} and
       \code{"mac.binary.universal"} are no longer in use.)
 #endif
     }
@@ -618,7 +622,7 @@ getOption(x, default = NULL)
   Wadsworth & Brooks/Cole.
 }
 \examples{
-op <- options(); utils::str(op) # op() may contain functions.
+op <- options(); utils::str(op) # op is a named list
 
 getOption("width") == options()$width # the latter needs more memory
 options(digits = 15)

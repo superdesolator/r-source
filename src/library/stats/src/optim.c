@@ -1,6 +1,6 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 1999-2012  The R Core Team
+ *  Copyright (C) 1999-2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -174,6 +174,7 @@ SEXP optim(SEXP call, SEXP op, SEXP args, SEXP rho)
     double *dpar, *opar, val = 0.0, abstol, reltol, temp;
     const char *tn;
     OptStruct OS;
+    PROTECT_INDEX par_index;
 
     args = CDR(args);
     OS = (OptStruct) R_alloc(1, sizeof(opt_struct));
@@ -190,8 +191,9 @@ SEXP optim(SEXP call, SEXP op, SEXP args, SEXP rho)
     tn = CHAR(STRING_ELT(method, 0));
     args = CDR(args); options = CAR(args);
     PROTECT(OS->R_fcall = lang2(fn, R_NilValue));
-    /* I don't think duplication is needed here */
-    PROTECT(par = coerceVector(duplicate(par), REALSXP));
+    PROTECT_WITH_INDEX(par = coerceVector(par, REALSXP), &par_index);
+    if (NAMED(par))
+    	REPROTECT(par = duplicate(par), par_index);
     npar = LENGTH(par);
     dpar = vect(npar);
     opar = vect(npar);
@@ -247,7 +249,8 @@ SEXP optim(SEXP call, SEXP op, SEXP args, SEXP rho)
 	tmax = asInteger(getListElement(options, "tmax"));
 	temp = asReal(getListElement(options, "temp"));
 	if (trace) trace = asInteger(getListElement(options, "REPORT"));
-	if (tmax == NA_INTEGER) error(_("'tmax' is not an integer"));
+	if (tmax == NA_INTEGER || tmax < 1) // PR#15194
+	    error(_("'tmax' is not a positive integer"));
 	if (!isNull(gr)) {
 	    if (!isFunction(gr)) error(_("'gr' is not a function"));
 		PROTECT(OS->R_gcall = lang2(gr, R_NilValue));

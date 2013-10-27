@@ -3,7 +3,7 @@
  *  file extra.c
  *  Copyright (C) 1998--2003  Guido Masarotto and Brian Ripley
  *  Copyright (C) 2004	      The R Foundation
- *  Copyright (C) 2005--2010  The R Core Team
+ *  Copyright (C) 2005--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -153,12 +153,14 @@ void Rwin_fpset(void)
 SEXP in_loadRconsole(SEXP sfile)
 {
     struct structGUI gui;
+    const void *vmax = vmaxget();
 
     if (!isString(sfile) || LENGTH(sfile) < 1)
 	error(_("invalid '%s' argument"), "file");
     getActive(&gui);  /* Will get defaults if there's no active console */
     if (loadRconsole(&gui, translateChar(STRING_ELT(sfile, 0)))) applyGUI(&gui);
     if (strlen(gui.warning)) warning(gui.warning);
+    vmaxset(vmax);
     return R_NilValue;
 }
 
@@ -183,7 +185,8 @@ SEXP do_sysinfo(SEXP call, SEXP op, SEXP args, SEXP rho)
     SET_STRING_ELT(ans, 0, mkChar("Windows"));
 
     /* Here for unknown future versions */
-    sprintf(ver, "%d.%d", (int)osvi.dwMajorVersion, (int)osvi.dwMinorVersion);
+    snprintf(ver, 256, "%d.%d", 
+	     (int)osvi.dwMajorVersion, (int)osvi.dwMinorVersion);
 
     if((int)osvi.dwMajorVersion >= 5) {
 	PGNSI pGNSI;
@@ -217,13 +220,13 @@ SEXP do_sysinfo(SEXP call, SEXP op, SEXP args, SEXP rho)
 
     if((int)osvi.dwMajorVersion >= 5) {
 	if(osvi.wServicePackMajor > 0)
-	    sprintf(ver, "build %d, Service Pack %d",
-		    LOWORD(osvi.dwBuildNumber),
-		    (int) osvi.wServicePackMajor);
-	else sprintf(ver, "build %d", LOWORD(osvi.dwBuildNumber));
+	    snprintf(ver, 256, "build %d, Service Pack %d",
+		     LOWORD(osvi.dwBuildNumber),
+		     (int) osvi.wServicePackMajor);
+	else snprintf(ver, 256, "build %d", LOWORD(osvi.dwBuildNumber));
     } else
-	sprintf(ver, "build %d, %s", LOWORD(osvi.dwBuildNumber),
-		osvi.szCSDVersion);
+	snprintf(ver, 256, "build %d, %s",
+		 LOWORD(osvi.dwBuildNumber), osvi.szCSDVersion);
     SET_STRING_ELT(ans, 2, mkChar(ver));
     GetComputerNameW(name, &namelen);
     wcstoutf8(buf, name, 1000);
@@ -521,6 +524,7 @@ SEXP in_shortpath(SEXP paths)
     char tmp[MAX_PATH];
     wchar_t wtmp[32768];
     DWORD res;
+    const void *vmax = vmaxget();
 
     if(!isString(paths)) error(_("'path' must be a character vector"));
 
@@ -547,6 +551,7 @@ SEXP in_shortpath(SEXP paths)
 	}
     }
     UNPROTECT(1);
+    vmaxset(vmax);
     return ans;
 }
     
@@ -731,7 +736,7 @@ char *getDLLVersion(void)
     /* 95, 98, ME are 4.x */
     if(osvi.dwMajorVersion < 5)
 	R_Suicide("Windows 2000 or later is required");
-    sprintf(DLLversion, "%s.%s", R_MAJOR, R_MINOR);
+    snprintf(DLLversion, 25, "%s.%s", R_MAJOR, R_MINOR);
     return (DLLversion);
 }
 

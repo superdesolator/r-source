@@ -1,7 +1,7 @@
 /*
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 1997--2012  The R Core Team
+ *  Copyright (C) 1997--2013  The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -1149,7 +1149,7 @@ SEXP attribute_hidden do_charmatch(SEXP call, SEXP op, SEXP args, SEXP env)
     PROTECT(ans = allocVector(INTSXP, n_input));
     int *ians = INTEGER(ans);
 
-    const void *vmax = vmaxget();
+    const void *vmax = vmaxget();  // prudence: .Internal does this too.
     for(R_xlen_t i = 0; i < n_input; i++) {
 	if(useBytes)
 	    ss = CHAR(STRING_ELT(input, i));
@@ -1255,8 +1255,8 @@ static SEXP subDots(SEXP rho)
 
     len = length(dots);
     PROTECT(rval=allocList(len));
-    for(a=dots, b=rval, i=1; i<=len; a=CDR(a), b=CDR(b), i++) {
-	sprintf(tbuf,"..%d",i);
+    for(a = dots, b = rval, i = 1; i <= len; a = CDR(a), b = CDR(b), i++) {
+	snprintf(tbuf, 10, "..%d",i);
 	SET_TAG(b, TAG(a));
 	t = CAR(a);
 	while (TYPEOF(t) == PROMSXP)
@@ -1630,7 +1630,7 @@ SEXP attribute_hidden do_makeunique(SEXP call, SEXP op, SEXP args, SEXP env)
     int n, len, maxlen = 0;
     HashData data;
     const char *csep, *ss;
-    void *vmax;
+    const void *vmax;
 
     checkArity(op, args);
     names = CAR(args);

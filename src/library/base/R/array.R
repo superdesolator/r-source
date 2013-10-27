@@ -32,7 +32,7 @@ function(data = NA, dim = length(data), dimnames = NULL)
             ## C code allows long vectors, but rep() does not.
             if(vl > .Machine$integer.max)
                 stop("'dim' specifies too large an array")
-            data <- rep(data, length.out=vl)
+            data <- rep_len(data, vl)
         }
         if(length(dim)) dim(data) <- dim
         if(is.list(dimnames) && length(dimnames)) dimnames(data) <- dimnames
@@ -60,7 +60,8 @@ function(x, MARGIN)
     y
 }
 
-provideDimnames <- function(x, sep="", base = list(LETTERS)) {
+provideDimnames <- function(x, sep = "", base = list(LETTERS))
+{
     ## provide dimnames where missing - not copying x unnecessarily
     dx <- dim(x)
     dnx <- dimnames(x)
@@ -69,9 +70,8 @@ provideDimnames <- function(x, sep="", base = list(LETTERS)) {
     k <- length(M <- vapply(base, length, 1L))
     for(i in which(vapply(dnx, is.null, NA))) {
 	ii <- 1L+(i-1L) %% k # recycling
-	dnx[[i]] <-
-	    make.unique(base[[ii]][1L+ 0:(dx[i]-1L) %% M[ii]],
-			sep = sep)
+        ss <- seq_len(dx[i]) - 1L # dim could be zero
+	dnx[[i]] <- make.unique(base[[ii]][1L+ (ss %% M[ii])], sep = sep)
 	new <- TRUE
     }
     if(new) dimnames(x) <- dnx

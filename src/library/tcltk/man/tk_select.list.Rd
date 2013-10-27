@@ -28,9 +28,8 @@ tk_select.list(choices, preselect = NULL, multiple = FALSE,
   scrollbar if the list is too long to fit comfortably on the screen.
 
   The dialog box is \emph{modal}, so a selection must be made or
-  cancelled before the \R session can proceed.  As from \R 2.10.1
-  double-clicking on an item is equivalent to selecting it and then
-  clicking \code{OK}.
+  cancelled before the \R session can proceed.  Double-clicking on an
+  item is equivalent to selecting it and then clicking \code{OK}.
 
   If Tk is version 8.5 or later, themed widgets will be used.
 }
@@ -41,8 +40,7 @@ tk_select.list(choices, preselect = NULL, multiple = FALSE,
   \code{Cancel} was used) then a character vector of length 0 is returned.
 }
 \seealso{
-  \code{\link{select.list}} (a text version except on Windows and the
-  Mac OS X GUI),
+  \code{\link{select.list}} (a text version except on Windows and the OS X GUI),
   \code{\link{menu}} (whose \code{graphics = TRUE} mode uses this
   on most Unix-alikes).
 }

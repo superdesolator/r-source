@@ -27,7 +27,7 @@ function(formula, data = NULL, ..., subset, na.action = stats::na.pass)
         m$data <- as.data.frame(data)
     m$... <- NULL
     m$na.action <- na.action # force in even if  default
-    m[[1L]] <- as.name("model.frame")
+    m[[1L]] <- quote(stats::model.frame)
     require(stats, quietly=TRUE)
     mf <- eval(m, parent.frame())
     pairs(mf, ...)
@@ -44,7 +44,7 @@ pairs.default <-
 function (x, labels, panel = points, ...,
           lower.panel = panel, upper.panel = panel,
           diag.panel = NULL, text.panel = textPanel,
-          label.pos = 0.5 + has.diag/3,
+          label.pos = 0.5 + has.diag/3, line.main = 3,
           cex.labels = NULL, font.labels = 1,
           row1attop = TRUE, gap = 1, log = "")
 {
@@ -157,7 +157,7 @@ function (x, labels, panel = points, ...,
     if (!is.null(main)) {
         font.main <- if("font.main" %in% nmdots) dots$font.main else par("font.main")
         cex.main <- if("cex.main" %in% nmdots) dots$cex.main else par("cex.main")
-        mtext(main, 3, 3, TRUE, 0.5, cex = cex.main, font = font.main)
+        mtext(main, 3, line.main, outer=TRUE, at = 0.5, cex = cex.main, font = font.main)
     }
     invisible(NULL)
 }

@@ -2,7 +2,7 @@
  *  R : A Computer Language for Statistical Data Analysis
  *  file run.c: a simple 'reading' pipe (and a command executor)
  *  Copyright  (C) 1999-2001  Guido Masarotto  and Brian Ripley
- *             (C) 2007-12    The R Core Team
+ *             (C) 2007-13    The R Core Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -399,7 +399,7 @@ int runcmd(const char *cmd, cetype_t enc, int wait, int visible,
 	cntxt.cenddata = &pi;
 	ret = pwait2(pi.hProcess);
 	endcontext(&cntxt);
-	sprintf(RunError, _("Exit code was %d"), ret);
+	snprintf(RunError, 501, _("Exit code was %d"), ret);
 	ret &= 0xffff;
     } else ret = 0;
     CloseHandle(pi.hProcess);
@@ -699,27 +699,22 @@ static size_t Wpipe_write(const void *ptr, size_t size, size_t nitems,
     else return 0;
 }
 
-#define BUFSIZE 1000
+#define BUFSIZE 10000
 static int Wpipe_vfprintf(Rconnection con, const char *format, va_list ap)
 {
-    char buf[BUFSIZE], *b = buf, *vmax = vmaxget();
-    int res = 0, usedRalloc = FALSE;
+    R_CheckStack2(BUFSIZE);
+    char buf[BUFSIZE], *b = buf;
+    int res = 0;
 
     res = vsnprintf(b, BUFSIZE, format, ap);
     if(res < 0) { /* a failure indication, so try again */
-	usedRalloc = TRUE;
-	b = R_alloc(10*BUFSIZE, sizeof(char));
-	res = vsnprintf(b, 10*BUFSIZE, format, ap);
-	if (res < 0) {
-	    *(b + 10*BUFSIZE) = '\0';
-	    warning("printing of extremely long output is truncated");
-	    res = 10*BUFSIZE;
-	}
+	b[BUFSIZE -1] = '\0';
+	warning("printing of extremely long output is truncated");
+	res = BUFSIZE;
     }
-    res = Wpipe_write(buf, res, 1, con);
-    if(usedRalloc) vmaxset(vmax);
-    return res;
+    return Wpipe_write(buf, res, 1, con);
 }
+
 
 Rconnection newWpipe(const char *description, int ienc, const char *mode)
 {

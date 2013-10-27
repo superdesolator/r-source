@@ -119,7 +119,10 @@ mcMap(f, ...)
 
   Each forked process runs its job inside \code{try(..., silent = TRUE)}
   so if errors occur they will be stored as class \code{"try-error"}
-  objects in the return value and a warning will be given.
+  objects in the return value and a warning will be given.  Note that
+  the job will typically involve more than one value of \code{X} and
+  hence a \code{"try-error"} object will be returned for all the values
+  involved in the failure, even if not all of them failed.
 }
 
 \section{Warning}{
@@ -130,11 +133,11 @@ mcMap(f, ...)
   devices.
 
   Some precautions have been taken to make this usable in
-  \command{R.app} on Mac OS X, but users of third-party front-ends
+  \command{R.app} on OS X, but users of third-party front-ends
   should consult their documentation.
 
   Note that \pkg{tcltk} counts as a GUI for these purposes since
-  \command{Tcl} runs an event loop.  As from \R 2.15.3 that event loop
+  \command{Tcl} runs an event loop.  That event loop
   is inhibited in a child process but there could still be problems with
   Tk graphical connections.
 }

@@ -51,13 +51,10 @@ httpd <- function(path, query, ...)
 
         out <- HTMLheader("R User Manuals")
         for (pkg in pkgs) {
-            filename <- system.file(file.path("Meta", "vignette.rds"),
-            			    package=pkg)
-     	    if (file.exists(filename)) {
-     	    	vignettes <- readRDS(filename)
+            vinfo <- getVignetteInfo(pkg)
+     	    if (nrow(vinfo)) 
          	out <- c(out, paste0('<h2>Manuals in package', sQuote(pkg),'</h2>'),
-         		 makeVignetteTable(cbind(Package=pkg, as.matrix(vignettes[,c("File", "Title", "PDF", "R")]))))
-            }
+         		 makeVignetteTable(cbind(Package=pkg, vinfo[,c("File", "Title", "PDF", "R")])))
      	}
         out <- c(out, "<hr>\n</body></html>")
         list(payload = paste(out, collapse="\n"))
@@ -201,7 +198,7 @@ httpd <- function(path, query, ...)
         return(list(file = file.path(R.home("doc"), "html", "favicon.ico")))
     else if(path == "/NEWS")
          return(list(file = file.path(R.home("doc"), "html", "NEWS.html")))
-    else if(path %in% c("/ONEWS", "/OONEWS")) # not installed
+    else if(grepl("^/NEWS[.][[:digit:]]$", path)) 
     	return(list(file = file.path(R.home(), sub("/", "", path)),
     	            "content-type" = "text/plain"))
     else if(!grepl("^/(doc|library|session)/", path))
@@ -226,7 +223,7 @@ httpd <- function(path, query, ...)
     if (grepl(topicRegexp, path)) {
         ## ----------------------- package help by topic ---------------------
     	pkg <- sub(topicRegexp, "\\1", path)
-    	if (pkg == "NULL") pkg <- NULL  # how can this occur?
+    	if (pkg == "NULL") pkg <- NULL  # There were multiple hits in the console
     	topic <- sub(topicRegexp, "\\2", path)
         ## if a package is specified, look there first, then everywhere
     	if (!is.null(pkg)) # () avoids deparse here
@@ -260,7 +257,7 @@ httpd <- function(path, query, ...)
                 tmp <- try(readRDS(fp[i]))
                 titles[i] <- if(inherits(tmp, "try-error"))
                     "unknown title" else
-                    tmp[file_path_sans_ext(tmp$PDF) == tp[i], "Title"]
+                    tmp[file_path_sans_ext(tmp$File) == tp[i], "Title"]
             }
             packages <- paste('<dt><a href="../../', basename(paths), '/html/',
                               basename(file), '.html">', titles,
